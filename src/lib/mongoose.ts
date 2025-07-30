@@ -9,15 +9,10 @@ if (!MONGO_URI) {
   );
 }
 
-/**
- * Caché de conexión global.
- * En un entorno serverless, la función puede ser invocada múltiples veces.
- * Reutilizar la conexión existente mejora el rendimiento.
- */
-let cached = (global as any).mongoose;
+let cached = global.mongoose;
 
 if (!cached) {
-  cached = (global as any).mongoose = { conn: null, promise: null };
+  cached = global.mongoose = { conn: null, promise: null };
 }
 
 async function dbConnect() {

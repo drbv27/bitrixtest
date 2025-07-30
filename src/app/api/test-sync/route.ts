@@ -9,11 +9,11 @@ export async function GET() {
       success: true,
       message: "Sincronización completada.",
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Fallo en la sincronización manual:", error);
-    return NextResponse.json(
-      { success: false, message: error.message },
-      { status: 500 }
-    );
+    // Verificamos si es un objeto Error para acceder a .message
+    const message =
+      error instanceof Error ? error.message : "Un error desconocido ocurrió.";
+    return NextResponse.json({ success: false, message }, { status: 500 });
   }
 }

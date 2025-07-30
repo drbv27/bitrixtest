@@ -10,10 +10,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { BitrixDeal } from "@/types/bitrix24";
 
 export default function DealsPage() {
-  // Usamos nuestro hook para obtener los datos, el estado de carga y de error
-  const { data: dealsData, isLoading, isError, error } = useDeals();
+  const { data, isLoading, isError, error } = useDeals();
 
   if (isLoading) {
     return <div className="p-8">Cargando deals...</div>;
@@ -24,6 +24,9 @@ export default function DealsPage() {
       <div className="p-8">Error al cargar los deals: {error.message}</div>
     );
   }
+
+  // Ahora 'data' está correctamente tipado gracias al hook
+  const deals: BitrixDeal[] = data?.result || [];
 
   return (
     <div className="p-8">
@@ -40,13 +43,15 @@ export default function DealsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {dealsData?.result?.map((deal: any) => (
+            {deals.map((deal) => (
               <TableRow key={deal.ID}>
                 <TableCell>{deal.ID}</TableCell>
                 <TableCell className="font-medium">{deal.TITLE}</TableCell>
                 <TableCell>{deal.STAGE_ID}</TableCell>
                 <TableCell>
-                  {new Intl.NumberFormat("en-US").format(deal.OPPORTUNITY)}
+                  {new Intl.NumberFormat("en-US").format(
+                    Number(deal.OPPORTUNITY)
+                  )}
                 </TableCell>
                 <TableCell>{deal.CURRENCY_ID}</TableCell>
               </TableRow>

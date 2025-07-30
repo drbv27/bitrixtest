@@ -3,16 +3,17 @@
 
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
+import { DealsApiResponse } from "@/types/bitrix24"; // Importamos nuestro nuevo tipo
 
-// Definimos una función para obtener los datos desde NUESTRO endpoint
-const fetchDeals = async () => {
-  const { data } = await axios.get("/api/deals");
+// Le decimos a Axios qué tipo de datos esperamos recibir
+const fetchDeals = async (): Promise<DealsApiResponse> => {
+  const { data } = await axios.get<DealsApiResponse>("/api/deals");
   return data;
 };
 
 export function useDeals() {
   return useQuery({
-    queryKey: ["deals"], // Una clave única para esta consulta
-    queryFn: fetchDeals, // La función que se ejecutará para obtener los datos
+    queryKey: ["deals"],
+    queryFn: fetchDeals,
   });
 }
