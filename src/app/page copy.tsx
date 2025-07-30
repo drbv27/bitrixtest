@@ -47,29 +47,19 @@ function SignOut({ name }: { name: string | null | undefined }) {
 
 // La página principal que decide qué mostrar
 export default async function Page() {
+  // Obtenemos la sesión del lado del servidor usando el método auth()
   const session = await auth();
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-gray-100">
-      <div className="w-full max-w-2xl rounded-lg border border-gray-300 bg-white p-8 shadow-lg">
-        <h1 className="mb-6 text-center text-2xl font-semibold">
+    <main className="flex min-h-screen flex-col items-center justify-center">
+      <div className="rounded-lg border border-gray-300 bg-white p-8 shadow-lg">
+        <h1 className="mb-6 text-2xl font-semibold">
           Plataforma de Analíticas
         </h1>
         {session?.user ? (
-          <div>
-            <SignOut name={session.user.name} />
-            <h2 className="mt-6 border-t pt-4 text-lg font-bold">
-              Datos de Sesión Completos:
-            </h2>
-            {/* Mostramos el objeto session completo para depuración */}
-            <pre className="mt-2 overflow-x-auto rounded-md bg-gray-800 p-4 text-sm text-white">
-              <code>{JSON.stringify(session, null, 2)}</code>
-            </pre>
-          </div>
+          <SignOut name={session.user.name} />
         ) : (
-          <div className="text-center">
-            <SignInButton />
-          </div>
+          <SignInButton />
         )}
       </div>
     </main>
