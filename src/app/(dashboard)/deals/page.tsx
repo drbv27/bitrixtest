@@ -1,6 +1,7 @@
 // src/app/(dashboard)/deals/page.tsx
 "use client";
 
+import { useState } from "react";
 import { useDeals } from "@/hooks/useDeals";
 import {
   Table,
@@ -11,26 +12,50 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { BitrixDeal } from "@/types/bitrix24";
+import { Button } from "@/components/ui/button"; // Importamos el componente Button de ShadCN
 
 export default function DealsPage() {
   const { data, isLoading, isError, error } = useDeals();
+  const [syncStatus, setSyncStatus] = useState("");
+  const [isSyncing, setIsSyncing] = useState(false);
 
-  if (isLoading) {
-    return <div className="p-8">Cargando deals...</div>;
-  }
+  const handleSync = async () => {
+    setIsSyncing(true);
+    setSyncStatus("Sincronizando, por favor espera...");
+    try {
+      const response = await fetch("/api/manual-sync", { method: "POST" });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message);
+      setSyncStatus("¡Sincronización completada con éxito!");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Error desconocido";
+      setSyncStatus(`Error en la sincronización: ${message}`);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
-  if (isError) {
+  if (isLoading) return <div className="p-8">Cargando deals...</div>;
+  if (isError)
     return (
       <div className="p-8">Error al cargar los deals: {error.message}</div>
     );
-  }
 
-  // Ahora 'data' está correctamente tipado gracias al hook
   const deals: BitrixDeal[] = data?.result || [];
 
   return (
     <div className="p-8">
-      <h1 className="mb-6 text-2xl font-bold">Deals del CRM</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold">Deals del CRM</h1>
+        <div>
+          <Button onClick={handleSync} disabled={isSyncing}>
+            {isSyncing ? "Sincronizando..." : "Sincronizar Todos los Deals"}
+          </Button>
+        </div>
+      </div>
+      {syncStatus && (
+        <p className="mb-4 text-center text-sm text-gray-600">{syncStatus}</p>
+      )}
       <div className="rounded-lg border">
         <Table>
           <TableHeader>
@@ -38,8 +63,6 @@ export default function DealsPage() {
               <TableHead>ID</TableHead>
               <TableHead>Título</TableHead>
               <TableHead>Etapa</TableHead>
-              <TableHead>Monto</TableHead>
-              <TableHead>Moneda</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -48,12 +71,6 @@ export default function DealsPage() {
                 <TableCell>{deal.ID}</TableCell>
                 <TableCell className="font-medium">{deal.TITLE}</TableCell>
                 <TableCell>{deal.STAGE_ID}</TableCell>
-                <TableCell>
-                  {new Intl.NumberFormat("en-US").format(
-                    Number(deal.OPPORTUNITY)
-                  )}
-                </TableCell>
-                <TableCell>{deal.CURRENCY_ID}</TableCell>
               </TableRow>
             ))}
           </TableBody>
