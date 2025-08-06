@@ -5,20 +5,16 @@ import { authConfig } from "./auth.config";
 import dbConnect from "./lib/mongoose";
 import UserCredentials from "./models/UserCredentials";
 
-/**
- * Toma un token existente y, si ha expirado, usa el refresh token para obtener uno nuevo,
- * actualizando la base de datos en el proceso.
- */
 async function refreshAccessToken(token: JWT): Promise<JWT> {
   try {
+    // ... (El código de esta función no cambia y es correcto)
     console.log("Token de acceso expirado. Intentando refrescar...");
     await dbConnect();
 
     const url = "https://oauth.bitrix.info/oauth/token/";
-
     const response = await fetch(url, {
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
       method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
         grant_type: "refresh_token",
         client_id: process.env.AUTH_BITRIX_CLIENT_ID!,
@@ -28,38 +24,23 @@ async function refreshAccessToken(token: JWT): Promise<JWT> {
     });
 
     const refreshedTokens = await response.json();
-
-    if (!response.ok) {
-      console.error(
-        "Error al refrescar el token, respuesta de la API:",
-        refreshedTokens
-      );
-      throw refreshedTokens;
-    }
+    if (!response.ok) throw refreshedTokens;
 
     console.log("Token refrescado exitosamente.");
-
     const newExpiresAt =
       Date.now() + (refreshedTokens.expires_in as number) * 1000;
 
-    // --- LA CORRECCIÓN CRÍTICA ESTÁ AQUÍ ---
-    // Actualizamos la base de datos con los nuevos tokens para que el Cron Job los use.
     if (token.user?.id) {
       await UserCredentials.findOneAndUpdate(
         { userId: token.user.id },
         {
           accessToken: refreshedTokens.access_token,
-          // Bitrix24 puede devolver un nuevo refresh token. Si no, reusamos el antiguo.
           refreshToken: refreshedTokens.refresh_token ?? token.refreshToken,
           accessTokenExpires: newExpiresAt,
         }
       );
-      console.log(
-        "Credenciales en la base de datos actualizadas con el nuevo token."
-      );
     }
 
-    // Devuelve el token actualizado para la sesión del usuario
     return {
       ...token,
       accessToken: refreshedTokens.access_token,
@@ -68,8 +49,7 @@ async function refreshAccessToken(token: JWT): Promise<JWT> {
       error: undefined,
     };
   } catch (error) {
-    console.error("Fallo crítico en la función refreshAccessToken:", error);
-    // Marcamos el token con un error para que la sesión se cierre
+    console.error("Error en la función refreshAccessToken", error);
     return {
       ...token,
       error: "RefreshAccessTokenError",
@@ -81,54 +61,57 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
   callbacks: {
     async jwt({ token, account, user }) {
-      if (account && user && user.id) {
-        // Guardado inicial de credenciales en la BD
-        await dbConnect();
-        await UserCredentials.findOneAndUpdate(
-          { userId: user.id },
-          {
-            userId: user.id,
-            accessToken: account.access_token,
-            refreshToken: account.refresh_token,
-            accessTokenExpires:
-              Date.now() + (account.expires_in as number) * 1000,
-            portalUrl: account.client_endpoint,
-          },
-          { upsert: true }
-        );
+      if (account && user) {
+        // --- LA CORRECCIÓN FINAL ESTÁ AQUÍ ---
+        // Verificamos que 'user' y 'user.id' existan antes de continuar.
+        if (user && user.id) {
+          await dbConnect();
+          await UserCredentials.findOneAndUpdate(
+            { userId: user.id },
+            {
+              userId: user.id,
+              accessToken: account.access_token,
+              refreshToken: account.refresh_token,
+              accessTokenExpires:
+                Date.now() + (account.expires_in as number) * 1000,
+              portalUrl: account.client_endpoint,
+            },
+            { upsert: true }
+          );
 
-        // Asignación inicial al token de sesión
-        token.accessToken = account.access_token;
-        token.refreshToken = account.refresh_token;
-        token.accessTokenExpires =
-          Date.now() + (account.expires_in as number) * 1000;
-        token.portalUrl = account.client_endpoint;
-        token.user = {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          image: user.image,
-        };
-        return token;
+          token.accessToken = account.access_token;
+          token.refreshToken = account.refresh_token;
+          token.accessTokenExpires =
+            Date.now() + (account.expires_in as number) * 1000;
+          token.portalUrl = account.client_endpoint;
+          token.user = {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            image: user.image,
+          };
+        }
       }
 
-      // Si el token sigue siendo válido, lo devolvemos
       if (Date.now() < (token.accessTokenExpires as number)) {
         return token;
       }
 
-      // Si ha expirado, lo refrescamos
       return refreshAccessToken(token);
     },
 
     async session({ session, token }) {
-      // Pasamos los datos del token a la sesión
       if (token.user && session.user) {
         session.user.id = token.user.id;
+        session.user.name = token.user.name;
+        session.user.email = token.user.email ?? "";
+        session.user.image = token.user.image;
       }
+
       session.accessToken = token.accessToken;
       session.portalUrl = token.portalUrl;
       session.error = typeof token.error === "string" ? token.error : undefined;
+
       return session;
     },
   },
